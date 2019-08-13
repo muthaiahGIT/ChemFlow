@@ -19,7 +19,7 @@ make
 
 ## Example
 
-Two examples, the counterflow diffusion flame of ethanol and methane, are provided. A standard OpenFOAM case directory with *chemkin*, *constant* and *system* is still needed for holding `BasicChemistryModel`. The reaction mechanism should be supplied in *chemkin*, either in CHEMKIN or OpenFOAM format.
+Two examples, the counterflow diffusion flames of ethanol and methane, are provided. A standard OpenFOAM case directory with *chemkin*, *constant* and *system* is still needed for holding `BasicChemistryModel`. The reaction mechanism should be supplied in *chemkin*, either in CHEMKIN or OpenFOAM format.
 
 To run the program
 
