@@ -1,5 +1,5 @@
 // ChemFlow
-// -- StrainedChemFlow
+// -- ChemFlow
 // -- A Segregated Solution to the Quasi-1D Counterflow Flame
 // -- xu-zhang@sjtu.edu.cn
 #include <iostream>

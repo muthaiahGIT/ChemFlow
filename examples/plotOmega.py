@@ -1,4 +1,5 @@
 # Mon May 13 10:25:04 CST 2019
+# xu-zhang@sjtu.edu.cn
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -18,7 +19,7 @@ mpl.rcParams['savefig.dpi'] = 300
 mpl.rcParams['savefig.bbox'] = 'tight'
 
 # Files
-figname = '1'
+figname = 'Flame'
 print("Enter file names:")
 filename = []
 while True:

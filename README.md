@@ -12,17 +12,19 @@ This solver depends on [Eigen3](http://eigen.tuxfamily.org/index.php?title=Main_
 
 ```bash
 git clone https://github.com/ZX114/ChemFlow.git YOUR_WORKING_DIR/ChemFlow
-./Allgxx
+cd YOUR_WORKING_DIR/ChemFlow/build
+cmake ..
+make
 ```
 
-## Sample
+## Example
 
-A standard OpenFOAM case directory with *chemkin*, *constant* and *system* is still needed for holding BasicChemistryModel&lt;rhoReactionThermo&gt;. The reaction mechanism should be supplied in *chemkin*, either in CHEMKIN or OpenFOAM format.
+Two examples, the counterflow diffusion flame of ethanol and methane, are provided. A standard OpenFOAM case directory with *chemkin*, *constant* and *system* is still needed for holding `BasicChemistryModel`. The reaction mechanism should be supplied in *chemkin*, either in CHEMKIN or OpenFOAM format.
 
 To run the program
 
 ```bash
-YOUR_WORKING_DIR/ChemFlow/chemflow
+YOUR_WORKING_DIR/ChemFlow/build/chemflow > data/log &
 ```
 
 A simple script *plotOmega.py* is provided to visualize the reaction source terms
