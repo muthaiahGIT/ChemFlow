@@ -211,6 +211,7 @@ int main(int argc, char *argv[])
     const int writeFreq = std::stoi(dict["writeFreq"]);
     const double rhoInf = std::stod(dict["rhoInf"]);
     const double p0 = std::stod(dict["pressure"]);
+    const double lrRatio = std::stod(dict["lrRatio"]);
 
     const double dx = (XEND - XBEG) / (nx - 1);
     const double tprecision = numlimSmall;
@@ -322,13 +323,15 @@ int main(int argc, char *argv[])
         m.setZero();
         m(0) = rho(0) * u(0);
         for (int j=1; j<nx; j++) {
-            double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/(numlimGreat*dt);
-            double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/(numlimGreat*dt);
-            drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
-            drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
+            // double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/(numlimGreat*dt);
+            // double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/(numlimGreat*dt);
+            // drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
+            // drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
+            double drhodt0 = 0.0;
+            double drhodt1 = 0.0;
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
         }
-        const double rhouOffset = (-rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (rho(0) + rho(nx-1));
+        const double rhouOffset = (-lrRatio*rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (lrRatio*rho(0) + rho(nx-1));
         m = m.array() + rhouOffset;
         u = m.cwiseQuotient(rho);
         std::cout << std::setw(WIDTH) << "u.max "
