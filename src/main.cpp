@@ -17,9 +17,9 @@
 #include "tdma.h"
 #include "ChemThermo/ChemThermo.h"
 
-const double numlimSmall = 1e-8;
-const double numlimSmallSmall = 1e-14;
-const double numlimGreat = 1e12;
+const double numlimSmall        =   1e-8;
+const double numlimSmallSmall   =  1e-14;
+const double numlimGreat        =   1e12;
 
 void restore(const ChemThermo& gas, const Eigen::VectorXd& x,
              Eigen::VectorXd& u, Eigen::VectorXd& V,

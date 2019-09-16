@@ -1,6 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
-#include "../tdma.h"
+#include "../src/tdma.h"
 using namespace std;
 using namespace Eigen;
 
