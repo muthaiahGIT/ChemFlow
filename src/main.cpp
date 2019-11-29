@@ -154,7 +154,8 @@ int main(int argc, char *argv[])
     startTime = std::clock();
     Eigen::MatrixXd A(input_data.nx,input_data.nx);
     Eigen::MatrixXd b(input_data.nx,1);
-    Eigen::VectorXd m(input_data.nx);  // conservative form for continuity equation
+    // conservative form for continuity equation
+    Eigen::VectorXd m(input_data.nx);
     Eigen::VectorXd::Index loc;
     int iter = 0;
     while (true) {
@@ -198,8 +199,10 @@ int main(int argc, char *argv[])
         m.setZero();
         m(0) = gp.rho(0) * gp.u(0);
         for (int j=1; j<input_data.nx; j++) {
-            // double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/(numlimGreat*dt);
-            // double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/(numlimGreat*dt);
+            // double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/
+            //                  (numlimGreat*dt);
+            // double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/
+            //                  (numlimGreat*dt);
             // drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
             // drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
             double drhodt0 = 0.0;
@@ -207,7 +210,8 @@ int main(int argc, char *argv[])
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) -
                    0.5*(gp.rho(j-1)*gp.V(j-1)+gp.rho(j)*gp.V(j)));
         }
-        const double rhouOffset = (-input_data.lrRatio*gp.rho(0)*m(input_data.nx-1) -
+        const double rhouOffset = (-input_data.lrRatio*gp.rho(0)*
+                                   m(input_data.nx-1) -
                                    gp.rho(input_data.nx-1)*m(0)) /
                                   (input_data.lrRatio*gp.rho(0) +
                                    gp.rho(input_data.nx-1));
@@ -223,11 +227,17 @@ int main(int argc, char *argv[])
             A.setZero();
             b.setZero();
             for (int j=1; j<input_data.nx-1; j++) {
-                const double rhoDl = 0.5*(gp.rho(j)*gp.D(j)+gp.rho(j-1)*gp.D(j-1));
-                const double rhoDr = 0.5*(gp.rho(j)*gp.D(j)+gp.rho(j+1)*gp.D(j+1));
-                A(j,j-1) = -rhoDl*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
-                A(j,j) = 1.0 + rhoDl*dt/(gp.rho(j)*dx*dx) + rhoDr*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
-                A(j,j+1) = -rhoDr*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
+                const double rhoDl = 0.5*(gp.rho(j)*gp.D(j)+
+                                          gp.rho(j-1)*gp.D(j-1));
+                const double rhoDr = 0.5*(gp.rho(j)*gp.D(j)+
+                                          gp.rho(j+1)*gp.D(j+1));
+                A(j,j-1) = -rhoDl*dt/(gp.rho(j)*dx*dx) +
+                           (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
+                A(j,j) = 1.0 + rhoDl*dt/(gp.rho(j)*dx*dx) +
+                         rhoDr*dt/(gp.rho(j)*dx*dx) +
+                         (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
+                A(j,j+1) = -rhoDr*dt/(gp.rho(j)*dx*dx) +
+                           (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
                 b(j) = gp.Y[k](j) + dt*gp.wdot[k](j)/gp.rho(j);
             }
             A(0,0) = 1.0;
@@ -236,7 +246,8 @@ int main(int argc, char *argv[])
             b(input_data.nx-1) = input_data.YR[k];
             gp.Y[k] = tdma(A,b);
             std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
-                      << std::setw(WIDTH) << gp.Y[k].maxCoeff(&loc) << " @ position "
+                      << std::setw(WIDTH) << gp.Y[k].maxCoeff(&loc)
+                      << " @ position "
                       << loc << std::endl;
         }
         // Correct
@@ -256,11 +267,17 @@ int main(int argc, char *argv[])
         A.setZero();
         b.setZero();
         for (int j=1; j<input_data.nx-1; j++) {
-            const double rhoAlphal = 0.5*(gp.rho(j)*gp.alpha(j)+gp.rho(j-1)*gp.alpha(j-1));
-            const double rhoAlphar = 0.5*(gp.rho(j)*gp.alpha(j)+gp.rho(j+1)*gp.alpha(j+1));
-            A(j,j-1) = -rhoAlphal*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
-            A(j,j) = 1.0 + rhoAlphal*dt/(gp.rho(j)*dx*dx) + rhoAlphar*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
-            A(j,j+1) = -rhoAlphar*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
+            const double rhoAlphal = 0.5*(gp.rho(j)*gp.alpha(j)+
+                                          gp.rho(j-1)*gp.alpha(j-1));
+            const double rhoAlphar = 0.5*(gp.rho(j)*gp.alpha(j)+
+                                          gp.rho(j+1)*gp.alpha(j+1));
+            A(j,j-1) = -rhoAlphal*dt/(gp.rho(j)*dx*dx) +
+                       (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
+            A(j,j) = 1.0 + rhoAlphal*dt/(gp.rho(j)*dx*dx) +
+                     rhoAlphar*dt/(gp.rho(j)*dx*dx) +
+                     (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
+            A(j,j+1) = -rhoAlphar*dt/(gp.rho(j)*dx*dx) +
+                       (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
             b(j) = gp.hs(j) + dt*gp.qdot(j)/gp.rho(j);
         }
         A(0,0) = 1.0;
@@ -268,7 +285,8 @@ int main(int argc, char *argv[])
         b(0) = input_data.hsL;
         b(input_data.nx-1) = input_data.hsR;
         // Ignition
-        if (input_data.ign && time > input_data.ignBEGt && time < input_data.ignENDt) {
+        if (input_data.ign && time > input_data.ignBEGt &&
+            time < input_data.ignENDt) {
             A(input_data.nx/2,input_data.nx/2-1) = 0.0;
             A(input_data.nx/2,input_data.nx/2) = 1.0;
             A(input_data.nx/2,input_data.nx/2+1) = 0.0;
@@ -281,7 +299,8 @@ int main(int argc, char *argv[])
                   << loc << std::endl;
 
         gp.rhoPrev = gp.rho;
-        gas.updateThermo(gp.hs, gp.Y, Le, gp.rho, gp.mu, gp.kappa, gp.alpha, gp.D);
+        gas.updateThermo(gp.hs, gp.Y, Le, gp.rho,
+                         gp.mu, gp.kappa, gp.alpha, gp.D);
 
         time += dt;
         // Adjustable time step according to chemical time scale
