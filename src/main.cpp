@@ -17,158 +17,82 @@
 #include "tdma.h"
 #include "ChemThermo/ChemThermo.h"
 
-const double numlimSmall        =   1e-8;
-const double numlimSmallSmall   =  1e-14;
-const double numlimGreat        =   1e12;
+const double numlimSmall        =       1e-08;
+const double numlimSmallSmall   =       1e-14;
+const double numlimGreat        =        1e12;
+const double tprecision         =       1e-08;
+const double dtChem             =       1e-06;
+const size_t WIDTH              =          18;
+const double Le                 =         1.0;
 
-void restore(const ChemThermo& gas, const Eigen::VectorXd& x,
-             Eigen::VectorXd& u, Eigen::VectorXd& V,
-             Eigen::VectorXd& T, Eigen::VectorXd& hs,
-             std::vector<Eigen::VectorXd>& Y)
-{
-    std::vector<double> x0;
-    std::vector<double> u0;
-    std::vector<double> V0;
-    std::vector<double> T0;
-    std::vector<std::vector<double> > Y0(gas.nsp());
-    std::ifstream fin("initial_solution.csv");
-    std::string line, str;
-    std::getline(fin, line);
-    if ((std::count(line.begin(),line.end(),',')+1) != gas.nsp()+6)
-        throw std::runtime_error("Input x,u,V,rho,D,T,Y0,...,Ynsp-1");
-    while (std::getline(fin, line)) {
-        int n = 0;
-        std::istringstream buffer(line);
-        while(std::getline(buffer, str, ',')) {
-            switch (n) {
-                case 0:
-                    x0.push_back(std::stold(str));
-                    break;
-                case 1:
-                    u0.push_back(std::stold(str));
-                    break;
-                case 2:
-                    V0.push_back(std::stold(str));
-                    break;
-                case 3:
-                    break;
-                case 4:
-                    break;
-                case 5:
-                    T0.push_back(std::stold(str));
-                    break;
-                default:
-                    Y0[n-6].push_back(std::stold(str));
-                    break;
-            }
-            ++n;
-        }
-    }
+struct gas_phase {
+    // constructor
+    gas_phase(int nx, int nsp) :
+        u(nx), V(nx), T(nx), hs(nx), Y(nsp), wdot(nsp), qdot(nx),
+        rho(nx), rhoPrev(nx), mu(nx), kappa(nx), alpha(nx), D(nx)
+    { }
 
-    for (int j=0; j<x.size(); j++) {
-        u(j) = lininterp(x(j), x0, u0);
-        V(j) = lininterp(x(j), x0, V0);
-        T(j) = lininterp(x(j), x0, T0);
-        for (int k=0; k<gas.nsp(); k++) {
-            Y[k](j) = lininterp(x(j), x0, Y0[k]);
-        }
-        double y[gas.nsp()];
-        gas.massFractions(Y, y, j);
-        hs(j) = gas.calcHs(T(j), y);
-    }
+    // public member data
+    // primary variables
+    Eigen::VectorXd u;
+    Eigen::VectorXd V;
+    Eigen::VectorXd T;
+    Eigen::VectorXd hs;
+    std::vector<Eigen::VectorXd> Y;
+    std::vector<Eigen::VectorXd> wdot;
+    Eigen::VectorXd qdot;
+    // properties
+    Eigen::VectorXd rho;
+    Eigen::VectorXd rhoPrev;
+    Eigen::VectorXd mu;
+    Eigen::VectorXd kappa;
+    Eigen::VectorXd alpha;
+    Eigen::VectorXd D;
 }
 
-void write(const int& iter, const ChemThermo& gas, const Eigen::VectorXd& x,
-           const Eigen::VectorXd& u, const Eigen::VectorXd& V,
-           const Eigen::VectorXd& rho, const Eigen::VectorXd& D,
-           const Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
-           const Eigen::VectorXd& qdot, const std::vector<Eigen::VectorXd>& wdot)
-{
-    std::stringstream ss;
-    ss << iter;
-    std::ofstream fout("data/output-"+ss.str()+".csv");
-    std::ofstream rout("data/reaction-"+ss.str()+".csv");
-    // Output
-    fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
-    for (int k=0; k<gas.nsp(); k++) {
-        fout << "," << gas.speciesName(k);
-    }
-    fout << std::endl;
-    for (int j=0; j<x.size(); j++) {
-        fout << std::setprecision(8) << x(j) << ","
-             << std::setprecision(8) << u(j) << ","
-             << std::setprecision(8) << V(j) << ","
-             << std::setprecision(8) << rho(j) << ","
-             << std::setprecision(8) << D(j) << ","
-             << std::setprecision(8) << T(j);
-        for (int k=0; k<gas.nsp(); k++) {
-            fout << "," << std::setprecision(8) << Y[k](j);
-        }
-        fout << std::endl;
-    }
-    // Output reactions related quantities (source terms)
-    rout << "x (m),Qdot (J/m3 s)";
-    for (int k=0; k<gas.nsp(); k++) {
-        rout << "," << gas.speciesName(k);
-    }
-    rout << std::endl;
-    for (int j=0; j<x.size(); j++) {
-        rout << std::setprecision(6) << x(j) << ","
-             << std::setprecision(6) << qdot(j);
-        for (int k=0; k<gas.nsp(); k++) {
-            rout << "," << std::setprecision(6) << wdot[k](j);
-        }
-        rout << std::endl;
-    }
+struct input_data {
+    int nx;
+    double XBEG;
+    double XEND;
+    double tBEG;
+    double tEND;
+    double dtMax;
+    double a;
+    // BC
+    double VL;
+    double VR;
+    double TI;
+    double TL;
+    double TR;
+    std::vector<double> YL;
+    std::vector<double> YR;
+    std::string FUELNAME;
+
+    bool rstr;
+    bool ign;
+    bool strain;
+    double ignBEGt;
+    double ignENDt;
+    double ignHs;
+    double aBEG;
+    double aEND;
+    int writeFreq;
+    double rhoInf;
+    double p0;
+    double lrRatio;
+    double dx;
 }
 
-void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
-           const Eigen::VectorXd& u, const Eigen::VectorXd& V,
-           const Eigen::VectorXd& rho, const Eigen::VectorXd& D,
-           const Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
-           const Eigen::VectorXd& qdot, const std::vector<Eigen::VectorXd>& wdot)
-{
-    std::stringstream ss;
-    ss << time;
-    std::ofstream fout("data/output-"+ss.str()+".csv");
-    std::ofstream rout("data/reaction-"+ss.str()+".csv");
-    // Output
-    fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
-    for (int k=0; k<gas.nsp(); k++) {
-        fout << "," << gas.speciesName(k);
-    }
-    fout << std::endl;
-    for (int j=0; j<x.size(); j++) {
-        fout << std::setprecision(8) << x(j) << ","
-             << std::setprecision(8) << u(j) << ","
-             << std::setprecision(8) << V(j) << ","
-             << std::setprecision(8) << rho(j) << ","
-             << std::setprecision(8) << D(j) << ","
-             << std::setprecision(8) << T(j);
-        for (int k=0; k<gas.nsp(); k++) {
-            fout << "," << std::setprecision(8) << Y[k](j);
-        }
-        fout << std::endl;
-    }
-    // Output reactions related quantities (source terms)
-    rout << "x (m),Qdot (J/m3 s)";
-    for (int k=0; k<gas.nsp(); k++) {
-        rout << "," << gas.speciesName(k);
-    }
-    rout << std::endl;
-    for (int j=0; j<x.size(); j++) {
-        rout << std::setprecision(6) << x(j) << ","
-             << std::setprecision(6) << qdot(j);
-        for (int k=0; k<gas.nsp(); k++) {
-            rout << "," << std::setprecision(6) << wdot[k](j);
-        }
-        rout << std::endl;
-    }
-}
+
+void fill_input(const std::string fname);
+void restore(const ChemThermo& gas, const Eigen::VectorXd& x, gas_phase& gp);
+void write(const double iter, const ChemThermo& gas,
+           const Eigen::VectorXd& x, const gas_phase& gp);
 
 int main(int argc, char *argv[])
 {
     // input
+    fill_input("input.txt");
     std::ifstream finp("input.txt");
     if (!finp) throw std::runtime_error("input.txt NOT FOUND!");
     std::map<std::string, std::string> dict;
@@ -420,3 +344,104 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+void fill_input(const std::string fname)
+{
+
+}
+
+void restore(const ChemThermo& gas, const Eigen::VectorXd& x, gas_phase& gp)
+{
+    std::vector<double> x0;
+    std::vector<double> u0;
+    std::vector<double> V0;
+    std::vector<double> T0;
+    std::vector<std::vector<double> > Y0(gas.nsp());
+    std::ifstream fin("initial_solution.csv");
+    std::string line, str;
+    std::getline(fin, line);
+    if ((std::count(line.begin(),line.end(),',')+1) != gas.nsp()+6)
+        throw std::runtime_error("Input x,u,V,rho,D,T,Y0,...,Ynsp-1");
+    while (std::getline(fin, line)) {
+        int n = 0;
+        std::istringstream buffer(line);
+        while(std::getline(buffer, str, ',')) {
+            switch (n) {
+                case 0:
+                    x0.push_back(std::stold(str));
+                    break;
+                case 1:
+                    u0.push_back(std::stold(str));
+                    break;
+                case 2:
+                    V0.push_back(std::stold(str));
+                    break;
+                case 3:
+                    break;
+                case 4:
+                    break;
+                case 5:
+                    T0.push_back(std::stold(str));
+                    break;
+                default:
+                    Y0[n-6].push_back(std::stold(str));
+                    break;
+            }
+            ++n;
+        }
+    }
+
+    for (int j=0; j<x.size(); j++) {
+        gp.u(j) = lininterp(x(j), x0, u0);
+        gp.V(j) = lininterp(x(j), x0, V0);
+        gp.T(j) = lininterp(x(j), x0, T0);
+        for (int k=0; k<gas.nsp(); k++) {
+            gp.Y[k](j) = lininterp(x(j), x0, Y0[k]);
+        }
+        double y[gas.nsp()];
+        gas.massFractions(gp.Y, y, j);
+        gp.hs(j) = gas.calcHs(gp.T(j), y);
+    }
+}
+
+void write(const int iter, const ChemThermo& gas,
+           const Eigen::VectorXd& x, const gas_phase& gp)
+{
+    std::stringstream ss;
+    ss << iter;
+    std::ofstream fout("data/output-"+ss.str()+".csv");
+    std::ofstream rout("data/reaction-"+ss.str()+".csv");
+    // Output
+    fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
+    for (int k=0; k<gas.nsp(); k++) {
+        fout << "," << gas.speciesName(k);
+    }
+    fout << std::endl;
+    for (int j=0; j<x.size(); j++) {
+        fout << std::setprecision(8) << gp.x(j) << ","
+             << std::setprecision(8) << gp.u(j) << ","
+             << std::setprecision(8) << gp.V(j) << ","
+             << std::setprecision(8) << gp.rho(j) << ","
+             << std::setprecision(8) << gp.D(j) << ","
+             << std::setprecision(8) << gp.T(j);
+        for (int k=0; k<gas.nsp(); k++) {
+            fout << "," << std::setprecision(8) << gp.Y[k](j);
+        }
+        fout << std::endl;
+    }
+    // Output reactions related quantities (source terms)
+    rout << "x (m),Qdot (J/m3 s)";
+    for (int k=0; k<gas.nsp(); k++) {
+        rout << "," << gas.speciesName(k);
+    }
+    rout << std::endl;
+    for (int j=0; j<x.size(); j++) {
+        rout << std::setprecision(6) << gp.x(j) << ","
+             << std::setprecision(6) << gp.qdot(j);
+        for (int k = 0; k < gas.nsp(); k++) {
+            rout << "," << std::setprecision(6) << gp.wdot[k](j);
+        }
+        rout << std::endl;
+    }
+}
+
