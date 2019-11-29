@@ -34,13 +34,15 @@ struct gas_phase {
 
     // public member data
     // primary variables
-    Eigen::VectorXd u;
-    Eigen::VectorXd V;
-    Eigen::VectorXd T;
-    Eigen::VectorXd hs;
-    std::vector<Eigen::VectorXd> Y;
-    std::vector<Eigen::VectorXd> wdot;
-    Eigen::VectorXd qdot;
+    // Both std::vector and Eigen::VectorXd are used for the purpose of
+    // distinguishing between containers for species and spatial grid points
+    Eigen::VectorXd u;  // x-direction velocity [m/s]
+    Eigen::VectorXd V;  // v/y = dv/dy [1/s]
+    Eigen::VectorXd T;  // temperature [K]
+    Eigen::VectorXd hs;  // sensible enthalpy [J/kg]
+    std::vector<Eigen::VectorXd> Y;  // species mass fractions [-]
+    std::vector<Eigen::VectorXd> wdot;  // reaction rates [kg/m3 s]
+    Eigen::VectorXd qdot;  // heat source [J/m3 s]
     // properties
     Eigen::VectorXd rho;
     Eigen::VectorXd rhoPrev;
@@ -48,9 +50,9 @@ struct gas_phase {
     Eigen::VectorXd kappa;
     Eigen::VectorXd alpha;
     Eigen::VectorXd D;
-}
+};
 
-struct input_data {
+struct {
     int nx;
     double XBEG;
     double XEND;
@@ -67,6 +69,8 @@ struct input_data {
     std::vector<double> YL;
     std::vector<double> YR;
     std::string FUELNAME;
+    double hsL;
+    double hsR;
 
     bool rstr;
     bool ign;
@@ -81,7 +85,7 @@ struct input_data {
     double p0;
     double lrRatio;
     double dx;
-}
+} input_data;
 
 
 void fill_input(const std::string fname);
@@ -91,85 +95,28 @@ void write(const double iter, const ChemThermo& gas,
 
 int main(int argc, char *argv[])
 {
-    // input
+    // Input
     fill_input("input.txt");
-    std::ifstream finp("input.txt");
-    if (!finp) throw std::runtime_error("input.txt NOT FOUND!");
-    std::map<std::string, std::string> dict;
-    std::string name;
-    std::string value;
-    while (finp >> name) {
-        finp >> value;
-        dict[name] = value;
-    }
-    // Discretize space and time
-    const int nx = std::stoi(dict["nPoints"]);
-    const double XBEG = std::stod(dict["XBEG"]);
-    const double XEND = std::stod(dict["XEND"]);
-    const double TBEG = std::stod(dict["TBEG"]);
-    const double TEND = std::stod(dict["TEND"]);
-    const double dtMax = std::stod(dict["dtMax"]);
-    // BC
-    double a = std::stod(dict["strainRate"]);  // prescribed strain rate
-    const double VL = a*0;
-    const double VR = a*0;
-    const double TI = std::stod(dict["TI"]);
-    const double TL = std::stod(dict["TL"]);
-    const double TR = std::stod(dict["TR"]);
-    const double YO2Air = 0.23197;
-    const double YN2Air = 0.75425;
-    const double YARAir = 0.01378;
-    const double YFUEL = 1.0;
-    std::vector<double> YL;
-    std::vector<double> YR;
-    const std::string FUELNAME = dict["fuelName"];
-    // IC
-    const bool rstr = (dict["restore"] == "true" ? true : false);
-    const bool ign = (dict["ignition"] == "true" ? true : false);
-    const bool strain = (dict["strain"] == "true" ? true : false);
-    const double ignBEGt = std::stod(dict["ignBEGt"]);
-    const double ignENDt = std::stod(dict["ignENDt"]);
-    const double ignHs = std::stod(dict["ignHs"]);
-    const double aBEG = std::stod(dict["aBEG"]);
-    const double aEND = std::stod(dict["aEND"]);
-    const int writeFreq = std::stoi(dict["writeFreq"]);
-    const double rhoInf = std::stod(dict["rhoInf"]);
-    const double p0 = std::stod(dict["pressure"]);
-    const double lrRatio = std::stod(dict["lrRatio"]);
-
-    const double dx = (XEND - XBEG) / (nx - 1);
-    const double tprecision = numlimSmall;
-    Eigen::VectorXd x(nx);
-    double dtChem = 1e-6;  // initial chemical time scale
+    Eigen::VectorXd x(input_data.nx);
     double dt = dtChem;
-    double time = TBEG;
-
+    double time = input_data.TBEG;
     // Output
     std::ofstream fm("data/monitor.csv");
     fm << "time (s),temperature (K)" << std::endl;
-    const size_t WIDTH = 18;
 
     // Solution and initial conditions
-    // Both std::vector and Eigen::VectorXd are used for the purpose of
-    // distinguishing between containers for species and spatial grid points
     #include "createFields.H"
     ChemThermo gas(mesh, runTime, p0);
     const int nsp = gas.nsp();  // number of species
-    Eigen::VectorXd u(nx);  // x-direction velocity [m/s]
-    Eigen::VectorXd V(nx);  // v/y = dv/dy [1/s]
-    Eigen::VectorXd T(nx);  // temperature [K]
-    Eigen::VectorXd hs(nx);  // sensible enthalpy [J/kg]
-    std::vector<Eigen::VectorXd> Y(nsp);  // species mass fractions [-]
-    std::vector<Eigen::VectorXd> wdot(nsp);  // reaction rates [kg/m3 s]
-    Eigen::VectorXd qdot(nx);  // heat source [J/m3 s]
-    YL.resize(nsp, 0.0);
-    YR.resize(nsp, 0.0);
-    YL[gas.speciesIndex(FUELNAME)] = YFUEL;
-    YR[gas.speciesIndex("O2")] = YO2Air;
-    YR[gas.speciesIndex("N2")] = YN2Air;
-    YR[gas.speciesIndex("AR")] = YARAir;
-    const double hsL = gas.calcHs(TL, YL.data());
-    const double hsR = gas.calcHs(TR, YR.data());
+    gas_phase(input_data.nx, nsp);
+    input_data.YL.resize(nsp, 0.0);
+    input_data.YR.resize(nsp, 0.0);
+    input_data.YL[gas.speciesIndex(FUELNAME)] = YFUEL;
+    input_data.YR[gas.speciesIndex("O2")] = YO2Air;
+    input_data.YR[gas.speciesIndex("N2")] = YN2Air;
+    input_data.YR[gas.speciesIndex("AR")] = YARAir;
+    input_data.hsL = gas.calcHs(input_data.TL, input_data.YL.data());
+    input_data.hsR = gas.calcHs(input_data.TR, input_data.YR.data());
 
     for (int j=0; j<nx; j++) {
         x(j) = XBEG + dx*j;
@@ -347,6 +294,49 @@ int main(int argc, char *argv[])
 
 void fill_input(const std::string fname)
 {
+    std::ifstream finp(fname);
+    if (!finp) throw std::runtime_error("input.txt NOT FOUND!");
+    std::map<std::string, std::string> dict;
+    std::string name;
+    std::string value;
+    while (finp >> name) {
+        finp >> value;
+        dict[name] = value;
+    }
+    // Discretize space and time
+    input_data.nx = std::stoi(dict["nPoints"]);
+    input_data.XBEG = std::stod(dict["XBEG"]);
+    input_data.XEND = std::stod(dict["XEND"]);
+    input_data.tBEG = std::stod(dict["TBEG"]);
+    input_data.tEND = std::stod(dict["TEND"]);
+    input_data.dtMax = std::stod(dict["dtMax"]);
+    // BC
+    input_data.a = std::stod(dict["strainRate"]);  // prescribed strain rate
+    input_data.VL = a*0;
+    input_data.VR = a*0;
+    input_data.TI = std::stod(dict["TI"]);
+    input_data.TL = std::stod(dict["TL"]);
+    input_data.TR = std::stod(dict["TR"]);
+    input_data.YO2Air = 0.23197;
+    input_data.YN2Air = 0.75425;
+    input_data.YARAir = 0.01378;
+    input_data.YFUEL = 1.0;
+    input_data.FUELNAME = dict["fuelName"];
+    // IC
+    input_data.rstr = (dict["restore"] == "true" ? true : false);
+    input_data.ign = (dict["ignition"] == "true" ? true : false);
+    input_data.strain = (dict["strain"] == "true" ? true : false);
+    input_data.ignBEGt = std::stod(dict["ignBEGt"]);
+    input_data.ignENDt = std::stod(dict["ignENDt"]);
+    input_data.ignHs = std::stod(dict["ignHs"]);
+    input_data.aBEG = std::stod(dict["aBEG"]);
+    input_data.aEND = std::stod(dict["aEND"]);
+    input_data.writeFreq = std::stoi(dict["writeFreq"]);
+    input_data.rhoInf = std::stod(dict["rhoInf"]);
+    input_data.p0 = std::stod(dict["pressure"]);
+    input_data.lrRatio = std::stod(dict["lrRatio"]);
+
+    input_data.dx = (XEND - XBEG) / (nx - 1);
 
 }
 
