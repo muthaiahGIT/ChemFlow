@@ -21,7 +21,6 @@ const double numlimSmall        =       1e-08;
 const double numlimSmallSmall   =       1e-14;
 const double numlimGreat        =        1e12;
 const double tprecision         =       1e-08;
-const double dtChem             =       1e-06;
 const size_t WIDTH              =          18;
 const double Le                 =         1.0;
 
@@ -59,13 +58,17 @@ struct {
     double tBEG;
     double tEND;
     double dtMax;
-    double a;
+    double ainit;
     // BC
     double VL;
     double VR;
     double TI;
     double TL;
     double TR;
+    double YO2Air;
+    double YN2Air;
+    double YARAir;
+    double YFUEL;
     std::vector<double> YL;
     std::vector<double> YR;
     std::string FUELNAME;
@@ -84,7 +87,6 @@ struct {
     double rhoInf;
     double p0;
     double lrRatio;
-    double dx;
 } input_data;
 
 
@@ -97,197 +99,203 @@ int main(int argc, char *argv[])
 {
     // Input
     fill_input("input.txt");
+    const double dx = (input_data.XEND - input_data.XBEG)/(input_data.nx - 1);
+    double a = input_data.ainit;
     Eigen::VectorXd x(input_data.nx);
+    double dtChem = numlimSmall;
     double dt = dtChem;
-    double time = input_data.TBEG;
+    double time = input_data.tBEG;
     // Output
     std::ofstream fm("data/monitor.csv");
     fm << "time (s),temperature (K)" << std::endl;
 
     // Solution and initial conditions
     #include "createFields.H"
-    ChemThermo gas(mesh, runTime, p0);
+    ChemThermo gas(mesh, runTime, input_data.p0);
     const int nsp = gas.nsp();  // number of species
-    gas_phase(input_data.nx, nsp);
+    // construct gas_phase
+    gas_phase gp(input_data.nx, nsp);
     input_data.YL.resize(nsp, 0.0);
     input_data.YR.resize(nsp, 0.0);
-    input_data.YL[gas.speciesIndex(FUELNAME)] = YFUEL;
-    input_data.YR[gas.speciesIndex("O2")] = YO2Air;
-    input_data.YR[gas.speciesIndex("N2")] = YN2Air;
-    input_data.YR[gas.speciesIndex("AR")] = YARAir;
+    input_data.YL[gas.speciesIndex(input_data.FUELNAME)] = input_data.YFUEL;
+    input_data.YR[gas.speciesIndex("O2")] = input_data.YO2Air;
+    input_data.YR[gas.speciesIndex("N2")] = input_data.YN2Air;
+    input_data.YR[gas.speciesIndex("AR")] = input_data.YARAir;
     input_data.hsL = gas.calcHs(input_data.TL, input_data.YL.data());
     input_data.hsR = gas.calcHs(input_data.TR, input_data.YR.data());
 
-    for (int j=0; j<nx; j++) {
-        x(j) = XBEG + dx*j;
-        u(j) = -a*(x(j) - 0.5*(XEND-XBEG));
-        V(j) = a;
-        T(j) = TI;
+    for (int j=0; j<input_data.nx; j++) {
+        x(j) = input_data.XBEG + dx*j;
+        gp.u(j) = -a*(x(j) - 0.5*(input_data.XEND-input_data.XBEG));
+        gp.V(j) = a;
+        gp.T(j) = input_data.TI;
         for (int k=0; k<nsp; k++) {
-            Y[k].resize(nx);
-            wdot[k].resize(nx);
-            Y[k](j) = 0.0;
-            wdot[k](j) = 0.0;
+            gp.Y[k].resize(input_data.nx);
+            gp.wdot[k].resize(input_data.nx);
+            gp.Y[k](j) = 0.0;
+            gp.wdot[k](j) = 0.0;
         }
-        Y[gas.speciesIndex("O2")](j) = YO2Air;
-        Y[gas.speciesIndex("N2")](j) = YN2Air;
-        Y[gas.speciesIndex("AR")](j) = YARAir;
+        gp.Y[gas.speciesIndex("O2")](j) = input_data.YO2Air;
+        gp.Y[gas.speciesIndex("N2")](j) = input_data.YN2Air;
+        gp.Y[gas.speciesIndex("AR")](j) = input_data.YARAir;
         double y[nsp];
-        gas.massFractions(Y, y, j);
-        hs(j) = gas.calcHs(T(j), y);
-        qdot(j) = 0.0;
+        gas.massFractions(gp.Y, y, j);
+        gp.hs(j) = gas.calcHs(gp.T(j), y);
+        gp.qdot(j) = 0.0;
     }
 
-    if (rstr) restore(gas, x, u, V, T, hs, Y);
-    // Properties
-    const double Le = 1.0;
-    Eigen::VectorXd rho(nx);
-    Eigen::VectorXd rhoPrev(nx);
-    Eigen::VectorXd mu(nx);
-    Eigen::VectorXd kappa(nx);
-    Eigen::VectorXd alpha(nx);
-    Eigen::VectorXd D(nx);
-    gas.updateThermo(hs, Y, Le, rho, mu, kappa, alpha, D);
-    rhoPrev = rho;
+    if (input_data.rstr) restore(gas, x, gp);
+    gas.updateThermo(gp.hs, gp.Y, Le, gp.rho, gp.mu, gp.kappa, gp.alpha, gp.D);
+    gp.rhoPrev = gp.rho;
 
 
     // Time marching
     clock_t startTime, endTime;
     startTime = std::clock();
-    Eigen::MatrixXd A(nx,nx);
-    Eigen::MatrixXd b(nx,1);
-    Eigen::VectorXd m(nx);  // conservative form for continuity equation
+    Eigen::MatrixXd A(input_data.nx,input_data.nx);
+    Eigen::MatrixXd b(input_data.nx,1);
+    Eigen::VectorXd m(input_data.nx);  // conservative form for continuity equation
     Eigen::VectorXd::Index loc;
     int iter = 0;
     while (true) {
-        if (strain) {
-            a = aBEG + (aEND-aBEG)/(TEND-TBEG)*(time-TBEG);  // strain the flame
-            if (iter++%writeFreq == 0) write(iter, gas, x, u, V, rho, D, T, Y, qdot, wdot);
-            //sleep(1);
-        } else if (iter++%writeFreq == 0) {
-            write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+        if (input_data.strain) {
+            a = input_data.aBEG +
+                (input_data.aEND-input_data.aBEG)/
+                (input_data.tEND-input_data.tBEG)*
+                (time-input_data.tBEG);  // strain the flame
+            if (iter++%input_data.writeFreq == 0) write(iter, gas, x, gp);
+        } else if (iter++%input_data.writeFreq == 0) {
+            write(time, gas, x, gp);
         }
         fm << std::setprecision(10) << time << ","
-           << std::setprecision(10) << T.maxCoeff(&loc) << std::endl;
+           << std::setprecision(10) << gp.T.maxCoeff(&loc) << std::endl;
         // V equation
         A.setZero();
         b.setZero();
-        for (int j=1; j<nx-1; j++) {
-            const double mul = 0.5*(mu(j)+mu(j-1));
-            const double mur = 0.5*(mu(j)+mu(j+1));
-            A(j,j-1) = -mul*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-            A(j,j) = 1.0 + dt*V(j) + mul*dt/(rho(j)*dx*dx) + mur*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            A(j,j+1) = -mur*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            b(j) = rhoInf*a*a*dt/rho(j) + V(j);
+        for (int j=1; j<input_data.nx-1; j++) {
+            const double mul = 0.5*(gp.mu(j)+gp.mu(j-1));
+            const double mur = 0.5*(gp.mu(j)+gp.mu(j+1));
+            A(j,j-1) = -mul*dt/(gp.rho(j)*dx*dx) +
+                       (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
+            A(j,j) = 1.0 + dt*gp.V(j) + mul*dt/(gp.rho(j)*dx*dx) +
+                     mur*dt/(gp.rho(j)*dx*dx) +
+                     (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
+            A(j,j+1) = -mur*dt/(gp.rho(j)*dx*dx) +
+                       (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
+            b(j) = input_data.rhoInf*a*a*dt/gp.rho(j) + gp.V(j);
         }
         A(0,0) = 1.0;
-        A(nx-1,nx-1) = 1.0;
-        b(0) = VL;
-        b(nx-1) = VR;
-        V = tdma(A,b);
+        A(input_data.nx-1,input_data.nx-1) = 1.0;
+        b(0) = input_data.VL;
+        b(input_data.nx-1) = input_data.VR;
+        gp.V = tdma(A,b);
         std::cout << std::setw(WIDTH) << "V.max "
-                  << std::setw(WIDTH) << V.maxCoeff(&loc) << " @ position "
+                  << std::setw(WIDTH) << gp.V.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
 
         // Continuity equation
         // Propagate from left to right
         m.setZero();
-        m(0) = rho(0) * u(0);
-        for (int j=1; j<nx; j++) {
+        m(0) = gp.rho(0) * gp.u(0);
+        for (int j=1; j<input_data.nx; j++) {
             // double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/(numlimGreat*dt);
             // double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/(numlimGreat*dt);
             // drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
             // drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
             double drhodt0 = 0.0;
             double drhodt1 = 0.0;
-            m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
+            m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) -
+                   0.5*(gp.rho(j-1)*gp.V(j-1)+gp.rho(j)*gp.V(j)));
         }
-        const double rhouOffset = (-lrRatio*rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (lrRatio*rho(0) + rho(nx-1));
+        const double rhouOffset = (-input_data.lrRatio*gp.rho(0)*m(input_data.nx-1) -
+                                   gp.rho(input_data.nx-1)*m(0)) /
+                                  (input_data.lrRatio*gp.rho(0) +
+                                   gp.rho(input_data.nx-1));
         m = m.array() + rhouOffset;
-        u = m.cwiseQuotient(rho);
+        gp.u = m.cwiseQuotient(gp.rho);
         std::cout << std::setw(WIDTH) << "u.max "
-                  << std::setw(WIDTH) << u.maxCoeff(&loc) << " @ position "
+                  << std::setw(WIDTH) << gp.u.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
 
-        dtChem = gas.solve(dt, hs, Y, wdot, qdot);
+        dtChem = gas.solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
             b.setZero();
-            for (int j=1; j<nx-1; j++) {
-                const double rhoDl = 0.5*(rho(j)*D(j)+rho(j-1)*D(j-1));
-                const double rhoDr = 0.5*(rho(j)*D(j)+rho(j+1)*D(j+1));
-                A(j,j-1) = -rhoDl*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-                A(j,j) = 1.0 + rhoDl*dt/(rho(j)*dx*dx) + rhoDr*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-                A(j,j+1) = -rhoDr*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-                b(j) = Y[k](j) + dt*wdot[k](j)/rho(j);
+            for (int j=1; j<input_data.nx-1; j++) {
+                const double rhoDl = 0.5*(gp.rho(j)*gp.D(j)+gp.rho(j-1)*gp.D(j-1));
+                const double rhoDr = 0.5*(gp.rho(j)*gp.D(j)+gp.rho(j+1)*gp.D(j+1));
+                A(j,j-1) = -rhoDl*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
+                A(j,j) = 1.0 + rhoDl*dt/(gp.rho(j)*dx*dx) + rhoDr*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
+                A(j,j+1) = -rhoDr*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
+                b(j) = gp.Y[k](j) + dt*gp.wdot[k](j)/gp.rho(j);
             }
             A(0,0) = 1.0;
-            A(nx-1,nx-1) = 1.0;
-            b(0) = YL[k];
-            b(nx-1) = YR[k];
-            Y[k] = tdma(A,b);
+            A(input_data.nx-1,input_data.nx-1) = 1.0;
+            b(0) = input_data.YL[k];
+            b(input_data.nx-1) = input_data.YR[k];
+            gp.Y[k] = tdma(A,b);
             std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
-                      << std::setw(WIDTH) << Y[k].maxCoeff(&loc) << " @ position "
+                      << std::setw(WIDTH) << gp.Y[k].maxCoeff(&loc) << " @ position "
                       << loc << std::endl;
         }
         // Correct
-        for (int j=0; j<nx; j++) {
+        for (int j=0; j<input_data.nx; j++) {
             double sumY = 0.0;
             for (int k=0; k<nsp; k++) {
-                Y[k](j) = (Y[k](j) > 0.0 ? Y[k](j) : 0.0);
-                Y[k](j) = (Y[k](j) < 1.0 ? Y[k](j) : 1.0);
-                sumY += Y[k](j);
+                gp.Y[k](j) = (gp.Y[k](j) > 0.0 ? gp.Y[k](j) : 0.0);
+                gp.Y[k](j) = (gp.Y[k](j) < 1.0 ? gp.Y[k](j) : 1.0);
+                sumY += gp.Y[k](j);
             }
             for (int k=0; k<nsp; k++) {
-                Y[k](j) /= sumY;
+                gp.Y[k](j) /= sumY;
             }
         }
 
         // Energy eqaution
         A.setZero();
         b.setZero();
-        for (int j=1; j<nx-1; j++) {
-            const double rhoAlphal = 0.5*(rho(j)*alpha(j)+rho(j-1)*alpha(j-1));
-            const double rhoAlphar = 0.5*(rho(j)*alpha(j)+rho(j+1)*alpha(j+1));
-            A(j,j-1) = -rhoAlphal*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-            A(j,j) = 1.0 + rhoAlphal*dt/(rho(j)*dx*dx) + rhoAlphar*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            A(j,j+1) = -rhoAlphar*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            b(j) = hs(j) + dt*qdot(j)/rho(j);
+        for (int j=1; j<input_data.nx-1; j++) {
+            const double rhoAlphal = 0.5*(gp.rho(j)*gp.alpha(j)+gp.rho(j-1)*gp.alpha(j-1));
+            const double rhoAlphar = 0.5*(gp.rho(j)*gp.alpha(j)+gp.rho(j+1)*gp.alpha(j+1));
+            A(j,j-1) = -rhoAlphal*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? -dt*gp.u(j)/dx : 0.0);
+            A(j,j) = 1.0 + rhoAlphal*dt/(gp.rho(j)*dx*dx) + rhoAlphar*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? dt*gp.u(j)/dx : -dt*gp.u(j)/dx);
+            A(j,j+1) = -rhoAlphar*dt/(gp.rho(j)*dx*dx) + (gp.u(j) > 0.0 ? 0.0 : dt*gp.u(j)/dx);
+            b(j) = gp.hs(j) + dt*gp.qdot(j)/gp.rho(j);
         }
         A(0,0) = 1.0;
-        A(nx-1,nx-1) = 1.0;
-        b(0) = hsL;
-        b(nx-1) = hsR;
+        A(input_data.nx-1,input_data.nx-1) = 1.0;
+        b(0) = input_data.hsL;
+        b(input_data.nx-1) = input_data.hsR;
         // Ignition
-        if (ign && time > ignBEGt && time < ignENDt) {
-            A(nx/2,nx/2-1) = 0.0;
-            A(nx/2,nx/2) = 1.0;
-            A(nx/2,nx/2+1) = 0.0;
-            b(nx/2) = ignHs;
+        if (input_data.ign && time > input_data.ignBEGt && time < input_data.ignENDt) {
+            A(input_data.nx/2,input_data.nx/2-1) = 0.0;
+            A(input_data.nx/2,input_data.nx/2) = 1.0;
+            A(input_data.nx/2,input_data.nx/2+1) = 0.0;
+            b(input_data.nx/2) = input_data.ignHs;
         }
-        hs = tdma(A,b);
-        gas.calcT(T, Y, hs);
+        gp.hs = tdma(A,b);
+        gas.calcT(gp.T, gp.Y, gp.hs);
         std::cout << std::setw(WIDTH) << "T.max "
-                  << std::setw(WIDTH) << T.maxCoeff(&loc) << " @ position "
+                  << std::setw(WIDTH) << gp.T.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
 
-        rhoPrev = rho;
-        gas.updateThermo(hs, Y, Le, rho, mu, kappa, alpha, D);
+        gp.rhoPrev = gp.rho;
+        gas.updateThermo(gp.hs, gp.Y, Le, gp.rho, gp.mu, gp.kappa, gp.alpha, gp.D);
 
         time += dt;
         // Adjustable time step according to chemical time scale
         std::cout << "Time =  " << time << std::setprecision(10) << std::endl;
-        dt = std::min(dtChem, dtMax);
-        if (time+tprecision > TEND) break;
-        if (time+dt > TEND) dt = TEND - time;
+        dt = std::min(dtChem, input_data.dtMax);
+        if (time+tprecision > input_data.tEND) break;
+        if (time+dt > input_data.tEND) dt = input_data.tEND - time;
         std::cout << std::endl;
     }
     std::cout << "End" << std::endl;
     endTime = std::clock();
     std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
               << std::setprecision(6) << " s" << std::endl;
-    write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+    write(time, gas, x, gp);
 
     return 0;
 }
@@ -307,13 +315,13 @@ void fill_input(const std::string fname)
     input_data.nx = std::stoi(dict["nPoints"]);
     input_data.XBEG = std::stod(dict["XBEG"]);
     input_data.XEND = std::stod(dict["XEND"]);
-    input_data.tBEG = std::stod(dict["TBEG"]);
-    input_data.tEND = std::stod(dict["TEND"]);
+    input_data.tBEG = std::stod(dict["tBEG"]);
+    input_data.tEND = std::stod(dict["tEND"]);
     input_data.dtMax = std::stod(dict["dtMax"]);
     // BC
-    input_data.a = std::stod(dict["strainRate"]);  // prescribed strain rate
-    input_data.VL = a*0;
-    input_data.VR = a*0;
+    input_data.ainit = std::stod(dict["strainRate"]);  // prescribed strain rate
+    input_data.VL = input_data.ainit*0;
+    input_data.VR = input_data.ainit*0;
     input_data.TI = std::stod(dict["TI"]);
     input_data.TL = std::stod(dict["TL"]);
     input_data.TR = std::stod(dict["TR"]);
@@ -335,9 +343,6 @@ void fill_input(const std::string fname)
     input_data.rhoInf = std::stod(dict["rhoInf"]);
     input_data.p0 = std::stod(dict["pressure"]);
     input_data.lrRatio = std::stod(dict["lrRatio"]);
-
-    input_data.dx = (XEND - XBEG) / (nx - 1);
-
 }
 
 void restore(const ChemThermo& gas, const Eigen::VectorXd& x, gas_phase& gp)
@@ -394,7 +399,7 @@ void restore(const ChemThermo& gas, const Eigen::VectorXd& x, gas_phase& gp)
     }
 }
 
-void write(const int iter, const ChemThermo& gas,
+void write(const double iter, const ChemThermo& gas,
            const Eigen::VectorXd& x, const gas_phase& gp)
 {
     std::stringstream ss;
@@ -408,7 +413,7 @@ void write(const int iter, const ChemThermo& gas,
     }
     fout << std::endl;
     for (int j=0; j<x.size(); j++) {
-        fout << std::setprecision(8) << gp.x(j) << ","
+        fout << std::setprecision(8) << x(j) << ","
              << std::setprecision(8) << gp.u(j) << ","
              << std::setprecision(8) << gp.V(j) << ","
              << std::setprecision(8) << gp.rho(j) << ","
@@ -426,7 +431,7 @@ void write(const int iter, const ChemThermo& gas,
     }
     rout << std::endl;
     for (int j=0; j<x.size(); j++) {
-        rout << std::setprecision(6) << gp.x(j) << ","
+        rout << std::setprecision(6) << x(j) << ","
              << std::setprecision(6) << gp.qdot(j);
         for (int k = 0; k < gas.nsp(); k++) {
             rout << "," << std::setprecision(6) << gp.wdot[k](j);
