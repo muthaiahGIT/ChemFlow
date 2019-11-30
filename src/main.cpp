@@ -31,8 +31,12 @@ struct gas_phase {
         rho(nx), rhoPrev(nx), mu(nx), kappa(nx), alpha(nx), D(nx)
     {
         for (int k = 0; k < nsp; k++) {
-            Y[k].resize(nx, 0);
-            wdot[k].resize(nx, 0);
+            Y[k].resize(nx);
+            wdot[k].resize(nx);
+            for (int j = 0; j < nx; j++) {
+                Y[k](j) = 0.0;
+                wdot[k](j) = 0.0;
+            }
         }
     }
 
