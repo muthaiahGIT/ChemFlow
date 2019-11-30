@@ -29,7 +29,12 @@ struct gas_phase {
     gas_phase(int nx, int nsp) :
         u(nx), V(nx), T(nx), hs(nx), Y(nsp), wdot(nsp), qdot(nx),
         rho(nx), rhoPrev(nx), mu(nx), kappa(nx), alpha(nx), D(nx)
-    { }
+    {
+        for (int k = 0; k < nsp; k++) {
+            Y[k].resize(nx, 0);
+            wdot[k].resize(nx, 0);
+        }
+    }
 
     // public member data
     // primary variables
@@ -124,17 +129,11 @@ int main(int argc, char *argv[])
     input_data.hsL = gas.calcHs(input_data.TL, input_data.YL.data());
     input_data.hsR = gas.calcHs(input_data.TR, input_data.YR.data());
 
-    for (int j=0; j<input_data.nx; j++) {
+    for (int j = 0; j < input_data.nx; j++) {
         x(j) = input_data.XBEG + dx*j;
         gp.u(j) = -a*(x(j) - 0.5*(input_data.XEND-input_data.XBEG));
         gp.V(j) = a;
         gp.T(j) = input_data.TI;
-        for (int k=0; k<nsp; k++) {
-            gp.Y[k].resize(input_data.nx);
-            gp.wdot[k].resize(input_data.nx);
-            gp.Y[k](j) = 0.0;
-            gp.wdot[k](j) = 0.0;
-        }
         gp.Y[gas.speciesIndex("O2")](j) = input_data.YO2Air;
         gp.Y[gas.speciesIndex("N2")](j) = input_data.YN2Air;
         gp.Y[gas.speciesIndex("AR")](j) = input_data.YARAir;
@@ -445,7 +444,7 @@ void write(const double iter, const ChemThermo& gas,
     }
     // Output reactions related quantities (source terms)
     rout << "x (m),Qdot (J/m3 s)";
-    for (int k=0; k<gas.nsp(); k++) {
+    for (int k = 0; k < gas.nsp(); k++) {
         rout << "," << gas.speciesName(k);
     }
     rout << std::endl;
