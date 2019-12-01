@@ -248,10 +248,12 @@ int main(int argc, char *argv[])
             b(0) = input_data.YL[k];
             b(input_data.nx-1) = input_data.YR[k];
             gp.Y[k] = tdma(A,b);
-            std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
-                      << std::setw(WIDTH) << gp.Y[k].maxCoeff(&loc)
-                      << " @ position "
-                      << loc << std::endl;
+            // std::cout << std::setw(WIDTH)
+            //           << "Y-" + gas.speciesName(k) + ".max "
+            //           << std::setw(WIDTH)
+            //           << gp.Y[k].maxCoeff(&loc)
+            //           << " @ position "
+            //           << loc << std::endl;
         }
         // Correct
         for (int j=0; j<input_data.nx; j++) {
