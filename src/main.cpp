@@ -128,7 +128,11 @@ int main(int argc, char *argv[])
     gas_phase gp(input_data.nx, nsp);
     input_data.YL.resize(nsp, 0.0);
     input_data.YR.resize(nsp, 0.0);
-    input_data.YL[gas.speciesIndex(input_data.FUELNAME)] = input_data.YFUEL;
+    // input_data.YL[gas.speciesIndex(input_data.FUELNAME)] = input_data.YFUEL;
+    for (int k = 0; k < input_data.FUELNAMES.size(); k++) {
+        string s(input_data.FUELNAMES[k]);
+        input_data.YL[gas.speciesIndex(s)] = input_data.YFUELS[k];
+    }
     input_data.YR[gas.speciesIndex("O2")] = input_data.YO2Air;
     input_data.YR[gas.speciesIndex("N2")] = input_data.YN2Air;
     input_data.YR[gas.speciesIndex("AR")] = input_data.YARAir;
