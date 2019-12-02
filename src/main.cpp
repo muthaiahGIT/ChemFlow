@@ -77,9 +77,11 @@ struct {
     double YO2Air;
     double YN2Air;
     double YARAir;
+    std::vector<double> YFUELS;  // multi-component fuel
     double YFUEL;
     std::vector<double> YL;
     std::vector<double> YR;
+    std::vector<std::string> FUELNAMES; // multi-component fuel
     std::string FUELNAME;
     double hsL;
     double hsR;
@@ -353,6 +355,23 @@ void fill_input(const std::string fname)
     input_data.YN2Air = 0.75425;
     input_data.YARAir = 0.01378;
     input_data.YFUEL = 1.0;
+    std::string str;
+    std::string temp = dict["fuelNames"];
+    std::stringstream buf1(temp);
+    while (std::getline(buf1, str, ',')) {
+        input_data.FUELNAMES.push_back(str);
+    }
+    temp = dict["YFUELS"];
+    std::stringstream buf2(temp);
+    while (std::getline(buf2, str, ',')) {
+        input_data.YFUELS.push_back(std::stod(str));
+    }
+    for (string s : input_data.FUELNAMES) {
+        std::cout << s << std::endl;
+    }
+    for (double yi : input_data.YFUELS) {
+        std::cout << yi << std::endl;
+    }
     input_data.FUELNAME = dict["fuelName"];
     // IC
     input_data.rstr = (dict["restore"] == "true" ? true : false);
