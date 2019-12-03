@@ -78,11 +78,9 @@ struct {
     double YN2Air;
     double YARAir;
     std::vector<double> YFUELS;  // multi-component fuel
-    double YFUEL;
     std::vector<double> YL;
     std::vector<double> YR;
     std::vector<std::string> FUELNAMES; // multi-component fuel
-    std::string FUELNAME;
     double hsL;
     double hsR;
 
@@ -128,8 +126,8 @@ int main(int argc, char *argv[])
     gas_phase gp(input_data.nx, nsp);
     input_data.YL.resize(nsp, 0.0);
     input_data.YR.resize(nsp, 0.0);
-    // input_data.YL[gas.speciesIndex(input_data.FUELNAME)] = input_data.YFUEL;
-    for (int k = 0; k < input_data.FUELNAMES.size(); k++) {
+    int nFuels = input_data.FUELNAMES.size();
+    for (int k = 0; k < nFuels; k++) {
         string s(input_data.FUELNAMES[k]);
         input_data.YL[gas.speciesIndex(s)] = input_data.YFUELS[k];
     }
@@ -358,7 +356,6 @@ void fill_input(const std::string fname)
     input_data.YO2Air = 0.23197;
     input_data.YN2Air = 0.75425;
     input_data.YARAir = 0.01378;
-    input_data.YFUEL = 1.0;
     std::string str;
     std::string temp = dict["fuelNames"];
     std::stringstream buf1(temp);
@@ -376,7 +373,6 @@ void fill_input(const std::string fname)
     for (double yi : input_data.YFUELS) {
         std::cout << yi << std::endl;
     }
-    input_data.FUELNAME = dict["fuelName"];
     // IC
     input_data.rstr = (dict["restore"] == "true" ? true : false);
     input_data.ign = (dict["ignition"] == "true" ? true : false);
