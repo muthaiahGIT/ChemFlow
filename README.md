@@ -8,7 +8,7 @@
 
 ## Installation
 
-This solver depends on [Eigen3](http://eigen.tuxfamily.org/index.php?title=Main_Page) and [OpenFOAM-6](https://openfoam.org/), which can be easily installed using *apt-get* on Ubuntu.
+This solver depends on [Eigen3](http://eigen.tuxfamily.org/index.php?title=Main_Page) and [OpenFOAM-6](https://openfoam.org/), which can be installed using *apt-get* on Ubuntu.
 
 ```bash
 git clone https://github.com/ZX114/ChemFlow.git YOUR_WORKING_DIR/ChemFlow
