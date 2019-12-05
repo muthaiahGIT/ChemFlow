@@ -9,11 +9,9 @@ mpl.rcParams['font.size'] = 18
 mpl.rcParams['font.weight'] = 'medium'
 mpl.rcParams['font.style'] = 'normal'
 # mpl.rcParams['font.serif'] = 'DejaVu Serif'
-# mpl.rcParams['font.serif'] = 'Georgia'
-# mpl.rcParams['font.serif'] = 'Times New Roman'
 # mpl.rcParams['text.usetex'] = True
 mpl.rcParams['mathtext.fontset'] = 'stix'
-# mpl.rcParams['mathtext.fallback_to_cm'] = True
+mpl.rcParams['mathtext.fallback_to_cm'] = True
 mpl.rcParams['lines.linewidth'] = 2
 mpl.rcParams['savefig.dpi'] = 300
 mpl.rcParams['savefig.bbox'] = 'tight'
@@ -65,5 +63,5 @@ ax2.set_xticks(x_ticks)
 ax2.set_xlabel(r'$x$ (m)')
 ax2.set_ylabel(r'$\dot{Q}$ (J/m3 s)')
 fig1.tight_layout()
-# plt.savefig(figname+'.png',dpi=500,bbox_inches='tight')
 plt.show()
+
