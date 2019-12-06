@@ -1,0 +1,25 @@
+nPoints         201
+XBEG            0.0
+XEND            0.02
+tBEG            0.0
+tEND            0.2
+dtMax           1e-04
+strainRate      180.0
+TI              300.0
+TL              300.0
+TR              300.0
+fuelNames       NXC10H22,TMB
+YFUELS          0.5,0.5
+ignition        true
+restore         false
+strain          false
+ignBEGt         0.04
+ignENDt         0.06
+ignHs           5e6
+aBEG            1400.0
+aEND            1450.0
+writeFreq       50000
+rhoInf          1.1768
+pressure        101325.0
+lrRatio         0.5
+

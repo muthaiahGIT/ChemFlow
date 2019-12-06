@@ -19,7 +19,7 @@ make
 
 ## Example
 
-Two examples, the counterflow diffusion flames of ethanol and methane, are provided. A standard OpenFOAM case directory with *chemkin*, *constant* and *system* is still needed for holding `BasicChemistryModel`. The reaction mechanism should be supplied in *chemkin*, either in CHEMKIN or OpenFOAM format.
+Three examples, the counterflow diffusion flames of ethanol, kerosene (Aachen surrogate) and methane, are provided. A standard OpenFOAM case directory with *chemkin*, *constant* and *system* is still needed for holding `BasicChemistryModel`. The reaction mechanism should be supplied in *chemkin*, either in CHEMKIN or OpenFOAM format.
 
 To run the program
 
@@ -32,3 +32,4 @@ A simple script *plotOmega.py* is provided to visualize the reaction source term
 ```bash
 python plotOmega.py
 ```
+
