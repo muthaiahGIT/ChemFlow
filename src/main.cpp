@@ -87,6 +87,7 @@ struct {
     bool rstr;
     bool ign;
     bool strain;
+    bool log;
     double ignBEGt;
     double ignENDt;
     double ignHs;
@@ -197,9 +198,11 @@ int main(int argc, char *argv[])
         b(0) = input_data.VL;
         b(input_data.nx-1) = input_data.VR;
         gp.V = tdma(A,b);
+        if (input_data.log) {
         std::cout << std::setw(WIDTH) << "V.max "
                   << std::setw(WIDTH) << gp.V.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
+        }
 
         // Continuity equation
         // Propagate from left to right
@@ -224,9 +227,11 @@ int main(int argc, char *argv[])
                                    gp.rho(input_data.nx-1));
         m = m.array() + rhouOffset;
         gp.u = m.cwiseQuotient(gp.rho);
+        if (input_data.log) {
         std::cout << std::setw(WIDTH) << "u.max "
                   << std::setw(WIDTH) << gp.u.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
+        }
 
         dtChem = gas.solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot);
         // Y equations
@@ -303,9 +308,11 @@ int main(int argc, char *argv[])
         }
         gp.hs = tdma(A,b);
         gas.calcT(gp.T, gp.Y, gp.hs);
+        if (input_data.log) {
         std::cout << std::setw(WIDTH) << "T.max "
                   << std::setw(WIDTH) << gp.T.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
+        }
 
         gp.rhoPrev = gp.rho;
         gas.updateThermo(gp.hs, gp.Y, Le, gp.rho,
@@ -377,6 +384,7 @@ void fill_input(const std::string fname)
     input_data.rstr = (dict["restore"] == "true" ? true : false);
     input_data.ign = (dict["ignition"] == "true" ? true : false);
     input_data.strain = (dict["strain"] == "true" ? true : false);
+    input_data.log = (dict["log"] == "true" ? true : false);
     input_data.ignBEGt = std::stod(dict["ignBEGt"]);
     input_data.ignENDt = std::stod(dict["ignENDt"]);
     input_data.ignHs = std::stod(dict["ignHs"]);
