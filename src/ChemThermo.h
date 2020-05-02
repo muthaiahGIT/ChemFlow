@@ -1,6 +1,8 @@
 #ifndef CTF_CHEMTHERMO_H_
 #define CTF_CHEMTHERMO_H_
 #include <vector>
+#include <thread>
+#include <iostream>
 #include <Eigen/Dense>
 #include "fvCFD.H"
 #include "rhoReactionThermo.H"
@@ -50,10 +52,12 @@ public:
                       Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
                       Eigen::VectorXd& alpha, Eigen::VectorXd& D);
 
+
+
     // Solve the stiff chemistry and return the chemical time scale
     double solve(const double& deltaT, const Eigen::VectorXd& hs,
-                 const std::vector<Eigen::VectorXd>& Y,
-                 std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot);
+                 const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
+                 Eigen::VectorXd& qdot, ChemThermo& helper);
 
 
 private:
@@ -78,5 +82,8 @@ private:
 
     int nsp_;
     double p0_;
+public:
+    friend void thread_solve(const double, const Eigen::VectorXd&, const std::vector<Eigen::VectorXd>&, std::vector<Eigen::VectorXd>&, ChemThermo&, const int, const int, double&);
 };
+void thread_solve(const double, const Eigen::VectorXd&, const std::vector<Eigen::VectorXd>&, std::vector<Eigen::VectorXd>&, ChemThermo&, const int, const int, double&);
 #endif  // CTF_CHEMTHERMO_H_

@@ -12,8 +12,7 @@ This solver depends on [Eigen3](http://eigen.tuxfamily.org/index.php?title=Main_
 
 ```bash
 git clone https://github.com/ZX114/ChemFlow.git YOUR_WORKING_DIR/ChemFlow
-cd YOUR_WORKING_DIR/ChemFlow/build
-cmake ..
+cd YOUR_WORKING_DIR/ChemFlow/
 make
 ```
 

@@ -1,4 +1,5 @@
 #include "ChemThermo.h"
+#include <functional>
 
 using namespace Foam;
 
@@ -141,26 +142,63 @@ void ChemThermo::updateThermo(const Eigen::VectorXd& hs,
     }
 }
 
-double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
-                         const std::vector<Eigen::VectorXd>& Y,
-                         std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot)
+void thread_solve(const double delta_t, const Eigen::VectorXd& hs,
+    const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
+    ChemThermo& ct, const int begin, const int end, double& tmin)
 {
-    double tc = 1.0;
-    for (int j=0; j<hs.size(); j++) {
-        double y[nsp_];
-        massFractions(Y, y, j);
-        setY(y);
-        thermo_.p() = dimensionedScalar("p", dimPressure, p0_);
-        thermo_.he() = dimensionedScalar("h", dimEnergy/dimMass, hs(j));
-        thermo_.correct();
-
-        tc = min(tc, chemistry_.solve(deltaT));
-        // qdot(j) = chemistry_.Qdot()()[0];
-        for (int k=0; k<nsp_; k++) {
-            wdot[k](j) = chemistry_.RR(k)[0];
+    std::cout << "Thread solve | begin-" << begin << "-end-" << end << std::endl;
+    int nsp = Y.size();
+    for (int j = begin; j < end; j++) {
+        double y[nsp];
+        ct.massFractions(Y, y, j);
+        ct.setY(y);
+        ct.thermo_.p() = dimensionedScalar("p", dimPressure, ct.p0_);
+        ct.thermo_.he() = dimensionedScalar("h", dimEnergy/dimMass, hs(j));
+        ct.thermo_.correct();
+        tmin = min(tmin, ct.chemistry_.solve(delta_t));
+        for (int k = 0; k < nsp; k++) {
+            wdot[k](j) = ct.chemistry_.RR(k)[0];
         }
     }
-    // this->filter(wdot);
+    std::cout << "Exiting thread solve | begin-" << begin << "-end-" << end << std::endl;
+    return;
+}
+
+double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
+    const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
+    Eigen::VectorXd& qdot, ChemThermo& ct_helper)
+{
+    double tc = 1.0;
+    int len = hs.size();
+    int half = len / 2;
+    // [0~half), [half, len)
+    Eigen::VectorXd hs_helper;
+    std::vector<Eigen::VectorXd> Y_helper(nsp_);
+    std::vector<Eigen::VectorXd> wdot_helper(nsp_);
+    hs_helper.resize(len);
+    for (int j = 0; j < len; j++) {
+        hs_helper(j) = hs(j);
+    }
+    for (int k = 0; k < nsp_; k++) {
+        Y_helper[k].resize(len);
+        wdot_helper[k].resize(len);
+        for (int j = 0; j < len; j++) {
+            Y_helper[k](j) = Y[k](j);
+            wdot_helper[k](j) = 0.0;
+        }
+    }
+
+    double tc_helper = 1.0;
+    std::thread t1(std::bind(thread_solve, deltaT, std::ref(hs), std::ref(Y), std::ref(wdot), std::ref(*this), 0, half, std::ref(tc)));
+    std::thread t2(std::bind(thread_solve, deltaT, std::ref(hs_helper), std::ref(Y_helper), std::ref(wdot_helper), std::ref(ct_helper), half, len, std::ref(tc_helper)));
+    t1.join();
+    t2.join();
+    tc = min(tc, tc_helper);
+    for (int k = 0; k < nsp_; k++) {
+        for (int j = half; j < len; j++) {
+            wdot[k](j) = wdot_helper[k](j);
+        }
+    }
     // Compute qdot
     for (int j=0; j<hs.size(); j++) {
         qdot(j) = 0.0;

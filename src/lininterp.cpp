@@ -1,8 +1,7 @@
 #include "lininterp.h"
 
-template<class Type>
-Type lininterp(const double x, const std::vector<double>& xOld,
-               const std::vector<Type>& yOld)
+double lininterp(const double x, const std::vector<double>& xOld,
+               const std::vector<double>& yOld)
 {
     int n = xOld.size();
 

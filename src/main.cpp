@@ -15,7 +15,7 @@
 
 #include "lininterp.h"
 #include "tdma.h"
-#include "ChemThermo/ChemThermo.h"
+#include "ChemThermo.h"
 
 const double numlimSmall        =       1e-08;
 const double numlimSmallSmall   =       1e-14;
@@ -61,7 +61,7 @@ struct gas_phase {
 };
 
 struct {
-    int nx;
+    long nx;
     double XBEG;
     double XEND;
     double tBEG;
@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
     // Solution and initial conditions
     #include "createFields.H"
     ChemThermo gas(mesh, runTime, input_data.p0);
+    ChemThermo* gas_helper = new ChemThermo(mesh_helper, runTime_helper, input_data.p0);
     const int nsp = gas.nsp();  // number of species
     // construct gas_phase
     gas_phase gp(input_data.nx, nsp);
@@ -209,14 +210,14 @@ int main(int argc, char *argv[])
         m.setZero();
         m(0) = gp.rho(0) * gp.u(0);
         for (int j=1; j<input_data.nx; j++) {
-            // double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/
-            //                  (numlimGreat*dt);
-            // double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/
-            //                  (numlimGreat*dt);
-            // drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
-            // drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
-            double drhodt0 = 0.0;
-            double drhodt1 = 0.0;
+            double drhodt0 = (numlimGreat*(gp.rho(j-1) - gp.rhoPrev(j-1)))/
+                             (numlimGreat*dt);
+            double drhodt1 = (numlimGreat*(gp.rho(j) - gp.rhoPrev(j)))/
+                             (numlimGreat*dt);
+            drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
+            drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
+            // double drhodt0 = 0.0;
+            // double drhodt1 = 0.0;
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) -
                    0.5*(gp.rho(j-1)*gp.V(j-1)+gp.rho(j)*gp.V(j)));
         }
@@ -233,7 +234,7 @@ int main(int argc, char *argv[])
                   << loc << std::endl;
         }
 
-        dtChem = gas.solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot);
+        dtChem = gas.solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot, *gas_helper);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
