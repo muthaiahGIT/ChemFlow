@@ -5,14 +5,8 @@
 #include <Eigen/Dense>
 
 
-double lininterp(const double x, const std::vector<double>& xOld,
-               const std::vector<double>& yOld);
+double lininterp(const double x, const std::vector<double>& xOld, const std::vector<double>& yOld);
 
-double lininterp(const double x, const Eigen::VectorXd& xOld,
-                 const Eigen::VectorXd& yOld);
-
-// #ifdef NoRepository
-//     #include "lininterp.cpp"
-// #endif
+double lininterp(const double x, const Eigen::VectorXd& xOld, const Eigen::VectorXd& yOld);
 
 #endif  // CTF_LININTERP_H_

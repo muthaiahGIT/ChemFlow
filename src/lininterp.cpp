@@ -1,7 +1,6 @@
 #include "lininterp.h"
 
-double lininterp(const double x, const std::vector<double>& xOld,
-               const std::vector<double>& yOld)
+double lininterp(const double x, const std::vector<double>& xOld, const std::vector<double>& yOld)
 {
     int n = xOld.size();
 
@@ -57,8 +56,7 @@ double lininterp(const double x, const std::vector<double>& xOld,
     }
 }
 
-double lininterp(const double x, const Eigen::VectorXd& xOld,
-                 const Eigen::VectorXd& yOld)
+double lininterp(const double x, const Eigen::VectorXd& xOld, const Eigen::VectorXd& yOld)
 {
     int n = xOld.size();
 
@@ -113,4 +111,3 @@ double lininterp(const double x, const Eigen::VectorXd& xOld,
         return yOld[lo];
     }
 }
-

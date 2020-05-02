@@ -103,7 +103,7 @@ struct {
 void fill_input(const std::string fname);
 void restore(const ChemThermo& gas, const Eigen::VectorXd& x, gas_phase& gp);
 void write(const double iter, const ChemThermo& gas,
-           const Eigen::VectorXd& x, const gas_phase& gp);
+    const Eigen::VectorXd& x, const gas_phase& gp);
 
 int main(int argc, char *argv[])
 {
@@ -339,7 +339,7 @@ int main(int argc, char *argv[])
 void fill_input(const std::string fname)
 {
     std::ifstream finp(fname);
-    if (!finp) throw std::runtime_error("input.txt NOT FOUND!");
+    if (!finp) throw std::runtime_error("input.txt NOT FOUND");
     std::map<std::string, std::string> dict;
     std::string name;
     std::string value;
@@ -414,25 +414,25 @@ void restore(const ChemThermo& gas, const Eigen::VectorXd& x, gas_phase& gp)
         std::istringstream buffer(line);
         while(std::getline(buffer, str, ',')) {
             switch (n) {
-                case 0:
-                    x0.push_back(std::stold(str));
-                    break;
-                case 1:
-                    u0.push_back(std::stold(str));
-                    break;
-                case 2:
-                    V0.push_back(std::stold(str));
-                    break;
-                case 3:
-                    break;
-                case 4:
-                    break;
-                case 5:
-                    T0.push_back(std::stold(str));
-                    break;
-                default:
-                    Y0[n-6].push_back(std::stold(str));
-                    break;
+            case 0:
+                x0.push_back(std::stold(str));
+                break;
+            case 1:
+                u0.push_back(std::stold(str));
+                break;
+            case 2:
+                V0.push_back(std::stold(str));
+                break;
+            case 3:
+                break;
+            case 4:
+                break;
+            case 5:
+                T0.push_back(std::stold(str));
+                break;
+            default:
+                Y0[n-6].push_back(std::stold(str));
+                break;
             }
             ++n;
         }
@@ -491,4 +491,3 @@ void write(const double iter, const ChemThermo& gas,
         rout << std::endl;
     }
 }
-

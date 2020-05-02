@@ -37,27 +37,26 @@ public:
 
     // Call OpenFOAM correct() to compute temperature
     // with given sensible enthalpy and species mass fractions
-    void calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
-               const Eigen::VectorXd& hs);
+    void calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y, const Eigen::VectorXd& hs);
 
     // Transfer mass fractions field into a single C array
     // at point j for all species
-    void massFractions(const std::vector<Eigen::VectorXd>& Y,
-                       double* y, const int& j) const;
+    void massFractions(const std::vector<Eigen::VectorXd>& Y, double* y, const int j) const {
+        for (int k = 0; k < nsp_; k++) {
+            y[k] = Y[k](j);
+        }
+    }
 
     // Update thermophysical properties
-    void updateThermo(const Eigen::VectorXd& hs,
-                      const std::vector<Eigen::VectorXd>& Y,
-                      const double Le, Eigen::VectorXd& rho,
-                      Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
-                      Eigen::VectorXd& alpha, Eigen::VectorXd& D);
+    void updateThermo(const Eigen::VectorXd& hs, const std::vector<Eigen::VectorXd>& Y,
+        const double Le, Eigen::VectorXd& rho, Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
+        Eigen::VectorXd& alpha, Eigen::VectorXd& D);
 
 
 
     // Solve the stiff chemistry and return the chemical time scale
-    double solve(const double& deltaT, const Eigen::VectorXd& hs,
-                 const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
-                 Eigen::VectorXd& qdot, ChemThermo& helper);
+    double solve(const double& deltaT, const Eigen::VectorXd& hs, const std::vector<Eigen::VectorXd>& Y,
+        std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot, ChemThermo& helper);
 
 
 private:

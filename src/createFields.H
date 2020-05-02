@@ -85,7 +85,7 @@ patches_helper[0] = new Foam::emptyPolyPatch
 );
 
 mesh.addFvPatches(patches);
-mesh_helper.addFvPatches(patches);
+mesh_helper.addFvPatches(patches_helper);
 
 {
     Foam::volScalarField Ydefault

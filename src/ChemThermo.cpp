@@ -89,17 +89,15 @@ std::string ChemThermo::speciesName(const int& k) const
 double ChemThermo::calcHs(const double& T, const double* y) const
 {
     double hs = 0.0;
-    for (int k=0; k<nsp_; k++) {
+    for (int k = 0; k < nsp_; k++) {
         hs += y[k]*composition_.Hs(k, p0_, T);
     }
     return hs;
 }
 
-void ChemThermo::calcT(Eigen::VectorXd& T,
-                       const std::vector<Eigen::VectorXd>& Y,
-                       const Eigen::VectorXd& hs)
+void ChemThermo::calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y, const Eigen::VectorXd& hs)
 {
-    for (int j=0; j<T.size(); j++) {
+    for (int j = 0; j < T.size(); j++) {
         double y[nsp_];
         massFractions(Y, y, j);
         setY(y);
@@ -108,24 +106,14 @@ void ChemThermo::calcT(Eigen::VectorXd& T,
         thermo_.correct();
         T(j) = thermo_.T()[0];
     }
-
 }
 
-void ChemThermo::massFractions(const std::vector<Eigen::VectorXd>& Y,
-                               double* y, const int& j) const
-{
-    for (int k=0; k<nsp_; k++) {
-        y[k] = Y[k](j);
-    }
-}
 
 void ChemThermo::updateThermo(const Eigen::VectorXd& hs,
-                              const std::vector<Eigen::VectorXd>& Y,
-                              const double Le, Eigen::VectorXd& rho,
-                              Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
-                              Eigen::VectorXd& alpha, Eigen::VectorXd& D)
+    const std::vector<Eigen::VectorXd>& Y, const double Le, Eigen::VectorXd& rho,
+    Eigen::VectorXd& mu, Eigen::VectorXd& kappa, Eigen::VectorXd& alpha, Eigen::VectorXd& D)
 {
-    for (int j=0; j<hs.size(); j++) {
+    for (int j = 0; j < hs.size(); j++) {
         double y[nsp_];
         massFractions(Y, y, j);
         setY(y);
@@ -146,7 +134,6 @@ void thread_solve(const double delta_t, const Eigen::VectorXd& hs,
     const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
     ChemThermo& ct, const int begin, const int end, double& tmin)
 {
-    std::cout << "Thread solve | begin-" << begin << "-end-" << end << std::endl;
     int nsp = Y.size();
     for (int j = begin; j < end; j++) {
         double y[nsp];
@@ -160,7 +147,6 @@ void thread_solve(const double delta_t, const Eigen::VectorXd& hs,
             wdot[k](j) = ct.chemistry_.RR(k)[0];
         }
     }
-    std::cout << "Exiting thread solve | begin-" << begin << "-end-" << end << std::endl;
     return;
 }
 
@@ -171,7 +157,7 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
     double tc = 1.0;
     int len = hs.size();
     int half = len / 2;
-    // [0~half), [half, len)
+    // [0, half), [half, len)
     Eigen::VectorXd hs_helper;
     std::vector<Eigen::VectorXd> Y_helper(nsp_);
     std::vector<Eigen::VectorXd> wdot_helper(nsp_);
@@ -189,10 +175,9 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
     }
 
     double tc_helper = 1.0;
-    std::thread t1(std::bind(thread_solve, deltaT, std::ref(hs), std::ref(Y), std::ref(wdot), std::ref(*this), 0, half, std::ref(tc)));
-    std::thread t2(std::bind(thread_solve, deltaT, std::ref(hs_helper), std::ref(Y_helper), std::ref(wdot_helper), std::ref(ct_helper), half, len, std::ref(tc_helper)));
-    t1.join();
-    t2.join();
+    std::thread t_helper(std::bind(thread_solve, deltaT, std::ref(hs_helper), std::ref(Y_helper), std::ref(wdot_helper), std::ref(ct_helper), half, len, std::ref(tc_helper)));
+    thread_solve(deltaT, std::ref(hs), std::ref(Y), std::ref(wdot), std::ref(*this), 0, half, std::ref(tc));
+    t_helper.join();
     tc = min(tc, tc_helper);
     for (int k = 0; k < nsp_; k++) {
         for (int j = half; j < len; j++) {
@@ -200,9 +185,9 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
         }
     }
     // Compute qdot
-    for (int j=0; j<hs.size(); j++) {
+    for (int j = 0; j < len; j++) {
         qdot(j) = 0.0;
-        for (int k=0; k<nsp_; k++) {
+        for (int k = 0; k < nsp_; k++) {
             qdot(j) -= composition_.Hc(k)*wdot[k](j);
         }
     }
@@ -227,15 +212,15 @@ void ChemThermo::syncState()
 void ChemThermo::filter(std::vector<Eigen::VectorXd>& wdot) const
 {
     std::vector<Eigen::VectorXd> wdotOrig(nsp_);
-    for (int k=0; k<nsp_; k++) {
+    for (int k = 0; k < nsp_; k++) {
         wdotOrig[k].resize(wdot[k].size());
-        for (int j=0; j<wdotOrig[k].size(); j++) {
+        for (int j = 0; j < wdotOrig[k].size(); j++) {
             wdotOrig[k](j) = wdot[k](j);
         }
     }
     // 5-point averaging
-    for (int k=0; k<nsp_; k++) {
-        for (int j=2; j<wdot[k].size()-2; j++) {
+    for (int k = 0; k < nsp_; k++) {
+        for (int j = 2; j < wdot[k].size()-2; j++) {
             wdot[k][j] = 0.08*wdotOrig[k](j-2) + 0.17*wdotOrig[k](j-1)
                         + 0.5*wdotOrig[k](j)
                         + 0.17*wdotOrig[k](j+1) + 0.08*wdotOrig[k](j+2);
