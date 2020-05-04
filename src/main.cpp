@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <ctime>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 #include <string>
 #include <map>
@@ -16,6 +17,7 @@
 #include "lininterp.h"
 #include "tdma.h"
 #include "ChemThermo.h"
+#include "reaction_dispatch.h"
 
 const double numlimSmall        =       1e-08;
 const double numlimSmallSmall   =       1e-14;
@@ -123,6 +125,8 @@ int main(int argc, char *argv[])
     #include "createFields.H"
     ChemThermo gas(mesh, runTime, input_data.p0);
     ChemThermo* gas_helper = new ChemThermo(mesh_helper, runTime_helper, input_data.p0);
+
+    ReactionDispatch* reaction_dispatch = new ReactionDispatch(gas, *gas_helper);
     const int nsp = gas.nsp();  // number of species
     // construct gas_phase
     gas_phase gp(input_data.nx, nsp);
@@ -234,7 +238,7 @@ int main(int argc, char *argv[])
                   << loc << std::endl;
         }
 
-        dtChem = gas.solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot, *gas_helper);
+        dtChem = reaction_dispatch->solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
@@ -332,7 +336,9 @@ int main(int argc, char *argv[])
     std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
               << std::setprecision(6) << " s" << std::endl;
     write(time, gas, x, gp);
-
+    reaction_dispatch->complete();
+    delete gas_helper;
+    delete reaction_dispatch;
     return 0;
 }
 

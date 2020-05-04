@@ -17,7 +17,7 @@ CFLAGS = -m64 -Dlinux64 -DWM_ARCH_OPTION=64 -DWM_DP -DWM_LABEL_SIZE=32 -Wall -We
 
 
 chemflow: $(SRC)/*.cpp $(SRC)/*.h
-	$(cc) $(CFLAGS) -o chemflow $(SRC)/*.cpp $(INC_ALL) -L $(LIB_OF) $(LIBS)
+	$(cc) $(CFLAGS) -o chemflow_parallel $(SRC)/*.cpp $(INC_ALL) -L $(LIB_OF) $(LIBS)
 
 
 clean:

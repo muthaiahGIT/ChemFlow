@@ -130,73 +130,73 @@ void ChemThermo::updateThermo(const Eigen::VectorXd& hs,
     }
 }
 
-void thread_solve(const double delta_t, const Eigen::VectorXd& hs,
-    const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
-    ChemThermo& ct, const int begin, const int end, double& tmin)
-{
-    int nsp = Y.size();
-    for (int j = begin; j < end; j++) {
-        double y[nsp];
-        ct.massFractions(Y, y, j);
-        ct.setY(y);
-        ct.thermo_.p() = dimensionedScalar("p", dimPressure, ct.p0_);
-        ct.thermo_.he() = dimensionedScalar("h", dimEnergy/dimMass, hs(j));
-        ct.thermo_.correct();
-        tmin = min(tmin, ct.chemistry_.solve(delta_t));
-        for (int k = 0; k < nsp; k++) {
-            wdot[k](j) = ct.chemistry_.RR(k)[0];
-        }
-    }
-    return;
-}
+// void thread_solve(const double delta_t, const Eigen::VectorXd& hs,
+//     const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
+//     ChemThermo& ct, const int begin, const int end, double& tmin)
+// {
+//     int nsp = Y.size();
+//     for (int j = begin; j < end; j++) {
+//         double y[nsp];
+//         ct.massFractions(Y, y, j);
+//         ct.setY(y);
+//         ct.thermo_.p() = dimensionedScalar("p", dimPressure, ct.p0_);
+//         ct.thermo_.he() = dimensionedScalar("h", dimEnergy/dimMass, hs(j));
+//         ct.thermo_.correct();
+//         tmin = min(tmin, ct.chemistry_.solve(delta_t));
+//         for (int k = 0; k < nsp; k++) {
+//             wdot[k](j) = ct.chemistry_.RR(k)[0];
+//         }
+//     }
+//     return;
+// }
 
-double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
-    const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
-    Eigen::VectorXd& qdot, ChemThermo& ct_helper)
-{
-    double tc = 1.0;
-    int len = hs.size();
-    int half = len / 2;
-    // [0, half), [half, len)
-    Eigen::VectorXd hs_helper;
-    std::vector<Eigen::VectorXd> Y_helper(nsp_);
-    std::vector<Eigen::VectorXd> wdot_helper(nsp_);
-    hs_helper.resize(len);
-    for (int j = 0; j < len; j++) {
-        hs_helper(j) = hs(j);
-    }
-    for (int k = 0; k < nsp_; k++) {
-        Y_helper[k].resize(len);
-        wdot_helper[k].resize(len);
-        for (int j = 0; j < len; j++) {
-            Y_helper[k](j) = Y[k](j);
-            wdot_helper[k](j) = 0.0;
-        }
-    }
+// double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
+//     const std::vector<Eigen::VectorXd>& Y, std::vector<Eigen::VectorXd>& wdot,
+//     Eigen::VectorXd& qdot, ChemThermo& ct_helper)
+// {
+//     double tc = 1.0;
+//     int len = hs.size();
+//     int half = len / 2;
+//     // [0, half), [half, len)
+//     Eigen::VectorXd hs_helper;
+//     std::vector<Eigen::VectorXd> Y_helper(nsp_);
+//     std::vector<Eigen::VectorXd> wdot_helper(nsp_);
+//     hs_helper.resize(len);
+//     for (int j = 0; j < len; j++) {
+//         hs_helper(j) = hs(j);
+//     }
+//     for (int k = 0; k < nsp_; k++) {
+//         Y_helper[k].resize(len);
+//         wdot_helper[k].resize(len);
+//         for (int j = 0; j < len; j++) {
+//             Y_helper[k](j) = Y[k](j);
+//             wdot_helper[k](j) = 0.0;
+//         }
+//     }
 
-    double tc_helper = 1.0;
-    std::thread t_helper(std::bind(thread_solve, deltaT, std::ref(hs_helper), std::ref(Y_helper), std::ref(wdot_helper), std::ref(ct_helper), half, len, std::ref(tc_helper)));
-    thread_solve(deltaT, std::ref(hs), std::ref(Y), std::ref(wdot), std::ref(*this), 0, half, std::ref(tc));
-    t_helper.join();
-    tc = min(tc, tc_helper);
-    for (int k = 0; k < nsp_; k++) {
-        for (int j = half; j < len; j++) {
-            wdot[k](j) = wdot_helper[k](j);
-        }
-    }
-    // Compute qdot
-    for (int j = 0; j < len; j++) {
-        qdot(j) = 0.0;
-        for (int k = 0; k < nsp_; k++) {
-            qdot(j) -= composition_.Hc(k)*wdot[k](j);
-        }
-    }
-    return max(tc, small);
-}
+//     double tc_helper = 1.0;
+//     std::thread t_helper(std::bind(thread_solve, deltaT, std::ref(hs_helper), std::ref(Y_helper), std::ref(wdot_helper), std::ref(ct_helper), half, len, std::ref(tc_helper)));
+//     thread_solve(deltaT, std::ref(hs), std::ref(Y), std::ref(wdot), std::ref(*this), 0, half, std::ref(tc));
+//     t_helper.join();
+//     tc = min(tc, tc_helper);
+//     for (int k = 0; k < nsp_; k++) {
+//         for (int j = half; j < len; j++) {
+//             wdot[k](j) = wdot_helper[k](j);
+//         }
+//     }
+//     // Compute qdot
+//     for (int j = 0; j < len; j++) {
+//         qdot(j) = 0.0;
+//         for (int k = 0; k < nsp_; k++) {
+//             qdot(j) -= composition_.Hc(k)*wdot[k](j);
+//         }
+//     }
+//     return max(tc, small);
+// }
 
 void ChemThermo::setY(const double* y)
 {
-    for (int k=0; k<nsp_; k++) {
+    for (int k = 0; k < nsp_; k++) {
         Y_[k] = y[k];
     }
 }
@@ -226,4 +226,9 @@ void ChemThermo::filter(std::vector<Eigen::VectorXd>& wdot) const
                         + 0.17*wdotOrig[k](j+1) + 0.08*wdotOrig[k](j+2);
         }
     }
+}
+
+void log_debug(const std::string& msg)
+{
+    std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " : " << msg << std::endl;
 }
