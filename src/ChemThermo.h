@@ -57,9 +57,9 @@ public:
 
 
 
-    // // Solve the stiff chemistry and return the chemical time scale
-    // double solve(const double& deltaT, const Eigen::VectorXd& hs, const std::vector<Eigen::VectorXd>& Y,
-    //     std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot, ChemThermo& helper);
+    // Solve the stiff chemistry and return the chemical time scale
+    double solve(const double& deltaT, const Eigen::VectorXd& hs, const std::vector<Eigen::VectorXd>& Y,
+        std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot);
 
 
 private:
@@ -86,9 +86,7 @@ private:
     double p0_;
 public:
     friend class ReactionDispatch;
-    // friend void thread_solve(const double, const Eigen::VectorXd&, const std::vector<Eigen::VectorXd>&, std::vector<Eigen::VectorXd>&, ChemThermo&, const int, const int, double&);
 };
-// void thread_solve(const double, const Eigen::VectorXd&, const std::vector<Eigen::VectorXd>&, std::vector<Eigen::VectorXd>&, ChemThermo&, const int, const int, double&);
 
 void log_debug(const std::string& msg);
 #endif  // CTF_CHEMTHERMO_H_

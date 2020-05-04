@@ -239,6 +239,7 @@ int main(int argc, char *argv[])
         }
 
         dtChem = reaction_dispatch->solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot);
+        // dtChem = gas.solve(dt, gp.hs, gp.Y, gp.wdot, gp.qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
