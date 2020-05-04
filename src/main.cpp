@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
+#include <chrono>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -163,8 +164,9 @@ int main(int argc, char *argv[])
 
 
     // Time marching
-    clock_t startTime, endTime;
-    startTime = std::clock();
+    // clock_t startTime, endTime;
+    // startTime = std::clock();
+    auto startTime = std::chrono::steady_clock::now();
     Eigen::MatrixXd A(input_data.nx,input_data.nx);
     Eigen::MatrixXd b(input_data.nx,1);
     // conservative form for continuity equation
@@ -333,9 +335,10 @@ int main(int argc, char *argv[])
         std::cout << std::endl;
     }
     std::cout << "End" << std::endl;
-    endTime = std::clock();
-    std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
-              << std::setprecision(6) << " s" << std::endl;
+    // endTime = std::clock();
+    auto endTime = std::chrono::steady_clock::now();
+    std::cout << "Run time   " << std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000000
+        << " s" << std::endl;
     write(time, gas, x, gp);
     reaction_dispatch->complete();
     delete gas_helper;
