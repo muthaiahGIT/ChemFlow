@@ -196,5 +196,7 @@ void ChemThermo::filter(std::vector<Eigen::VectorXd>& wdot) const
 
 void log_debug(const std::string& msg)
 {
-    std::cout << std::chrono::system_clock::now().time_since_epoch().count() << " : " << msg << std::endl;
+    static std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()
+        << " : " << msg << std::endl;
 }

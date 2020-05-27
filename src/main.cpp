@@ -216,14 +216,14 @@ int main(int argc, char *argv[])
         m.setZero();
         m(0) = gp.rho(0) * gp.u(0);
         for (int j=1; j<input_data.nx; j++) {
-            double drhodt0 = (numlimGreat*(gp.rho(j-1) - gp.rhoPrev(j-1)))/
-                             (numlimGreat*dt);
-            double drhodt1 = (numlimGreat*(gp.rho(j) - gp.rhoPrev(j)))/
-                             (numlimGreat*dt);
-            drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
-            drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
-            // double drhodt0 = 0.0;
-            // double drhodt1 = 0.0;
+            // double drhodt0 = (numlimGreat*(gp.rho(j-1) - gp.rhoPrev(j-1)))/
+            //                  (numlimGreat*dt);
+            // double drhodt1 = (numlimGreat*(gp.rho(j) - gp.rhoPrev(j)))/
+            //                  (numlimGreat*dt);
+            // drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
+            // drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
+            double drhodt0 = 0.0;
+            double drhodt1 = 0.0;
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) -
                    0.5*(gp.rho(j-1)*gp.V(j-1)+gp.rho(j)*gp.V(j)));
         }
